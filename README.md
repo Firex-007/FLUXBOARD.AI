@@ -65,4 +65,3 @@ npm run dev
 
 ---
 
-*Built with ❤️ for the PIXEL.GEMINI Hackathon.*

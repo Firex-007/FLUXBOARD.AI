@@ -14,56 +14,60 @@ interface WiringMapProps {
   connections: Connection[];
 }
 
+import { Card } from '@/components/ui/card';
+
 export function WiringMap({ connections }: WiringMapProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={setIsOpen}>
-      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden h-full flex flex-col shadow-lg shadow-black/50 relative group">
-        <div className="bg-slate-800/50 p-4 border-b border-slate-700 flex justify-between items-center">
-          <h3 className="text-lime-400 font-mono text-sm tracking-wider uppercase flex items-center gap-2">
-            <Share2 className="w-4 h-4" />
-            Wiring Map
+      <div className="hud-glass rounded-2xl overflow-hidden h-full flex flex-col shadow-2xl relative group scan-effect">
+        <div className="bg-cyan-500/5 p-4 border-b border-white/5 flex justify-between items-center">
+          <h3 className="text-cyan-400 font-bold text-sm tracking-widest flex items-center gap-3">
+            <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 hud-glow" />
+            Wiring Schematics
           </h3>
           <Dialog.Trigger asChild>
-            <button className="text-slate-500 hover:text-lime-400 transition-colors">
+            <button className="p-2 hover:bg-white/5 rounded-xl text-slate-400 hover:text-cyan-400 transition-all active:scale-95">
               <Maximize2 className="w-4 h-4" />
             </button>
           </Dialog.Trigger>
         </div>
         
-        <div className="flex-1 overflow-auto p-0 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+        <div className="flex-1 overflow-auto hud-scroll p-0">
           <table className="w-full text-left text-sm border-collapse">
-            <thead className="bg-slate-900/80 sticky top-0 z-10 backdrop-blur text-xs font-mono uppercase tracking-wider text-slate-500 border-b border-slate-800">
+            <thead className="bg-black/40 sticky top-0 z-10 backdrop-blur-xl text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 border-b border-white/5">
               <tr>
-                <th className="px-4 py-3 font-medium">Source Pin</th>
-                <th className="px-4 py-3 font-medium">Destination Pin</th>
-                <th className="px-4 py-3 font-medium text-right">Type</th>
+                <th className="px-6 py-4 font-bold">Source Node</th>
+                <th className="px-6 py-4 font-bold">Target Node</th>
+                <th className="px-6 py-4 font-bold text-right">Path</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/50 text-slate-300 font-mono text-xs">
+            <tbody className="divide-y divide-white/5 text-slate-300 font-bold text-[11px] tracking-tight">
               {connections.map((conn, index) => (
                 <motion.tr 
                   key={conn.id}
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="hover:bg-slate-800/30 transition-colors group/row"
+                  transition={{ delay: index * 0.03, type: "spring", stiffness: 400, damping: 40 }}
+                  className="hover:bg-cyan-500/5 transition-all group/row cursor-default"
                 >
-                  <td className="px-4 py-3 font-medium text-cyan-300 relative">
-                    <span className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 shadow-[0_0_5px_rgba(6,182,212,0.5)]"></div>
+                  <td className="px-6 py-4 relative">
+                    <span className="flex items-center gap-3 text-cyan-400">
+                      <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.6)]"></div>
                       {conn.source}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-lime-300 relative">
-                     <span className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-lime-500 shadow-[0_0_5px_rgba(132,204,22,0.5)]"></div>
+                  <td className="px-6 py-4">
+                     <span className="flex items-center gap-3 text-lime-400">
+                      <div className="w-1.5 h-1.5 rounded-full bg-lime-500 shadow-[0_0_8px_rgba(132,204,22,0.6)]"></div>
                       {conn.dest}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right text-slate-500 group-hover/row:text-slate-400">
-                    {conn.type}
+                  <td className="px-6 py-4 text-right">
+                    <span className="px-2 py-1 rounded bg-white/5 border border-white/5 text-slate-500 group-hover/row:text-cyan-500/80 group-hover/row:border-cyan-500/20 transition-all font-mono">
+                      {conn.type}
+                    </span>
                   </td>
                 </motion.tr>
               ))}
@@ -72,7 +76,7 @@ export function WiringMap({ connections }: WiringMapProps) {
         </div>
         
         {/* Decorative Grid Background */}
-        <div className="absolute inset-0 pointer-events-none opacity-[0.03] bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)]" style={{ backgroundSize: "24px 24px" }}></div>
+        <div className="absolute inset-0 pointer-events-none opacity-[0.02] bg-[linear-gradient(to_right,#ffffff12_1px,transparent_1px),linear-gradient(to_bottom,#ffffff12_1px,transparent_1px)]" style={{ backgroundSize: "32px 32px" }}></div>
       </div>
 
       <Dialog.Portal>

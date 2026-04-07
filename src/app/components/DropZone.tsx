@@ -7,6 +7,8 @@ interface DropZoneProps {
   onGenerate: (prompt: string, imageBase64: string) => void;
 }
 
+import { Card } from '@/components/ui/card';
+
 export function DropZone({ onGenerate }: DropZoneProps) {
   const [file, setFile] = useState<File | null>(null);
   const [prompt, setPrompt] = useState("");
@@ -62,22 +64,22 @@ export function DropZone({ onGenerate }: DropZoneProps) {
   });
 
   return (
-    <div className="h-full flex flex-col gap-4">
+    <Card className="h-full flex flex-col gap-4 p-4 bg-slate-900/80 backdrop-blur-xl border-slate-800 shadow-2xl relative">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-lime-400 font-mono text-sm tracking-wider uppercase flex items-center gap-2">
-          <PenTool className="w-4 h-4" />
+        <h2 className="text-slate-200 font-semibold text-sm tracking-wide flex items-center gap-2">
+          <PenTool className="w-4 h-4 text-cyan-400" />
           Schematic Input
         </h2>
-        <span className="text-slate-500 text-xs font-mono">DRAG & DROP ENABLED</span>
+        <span className="text-slate-500 text-xs font-medium">Auto-Upload Area</span>
       </div>
 
       {/* Drop Zone */}
       <div
         {...getRootProps()}
         className={`
-          flex-1 rounded-2xl border-2 border-dashed transition-all duration-300 relative overflow-hidden group cursor-pointer
+          flex-1 rounded-xl border border-dashed transition-all duration-300 relative overflow-hidden group cursor-pointer
           ${isDragActive
-            ? 'border-lime-400 bg-lime-400/5 shadow-[0_0_30px_rgba(163,230,53,0.1)]'
+            ? 'border-cyan-400 bg-cyan-400/5 shadow-[0_0_30px_rgba(34,211,238,0.1)]'
             : 'border-slate-700 hover:border-cyan-400/50 hover:bg-slate-800/30 bg-slate-900/50'
           }
         `}
@@ -137,32 +139,32 @@ export function DropZone({ onGenerate }: DropZoneProps) {
       </div>
 
       {/* Prompt Input */}
-      <div className="relative group">
-        <div className={`absolute -inset-0.5 bg-gradient-to-r from-lime-400 to-cyan-400 rounded-xl opacity-20 group-hover:opacity-40 blur transition duration-500 ${isGenerating ? 'animate-pulse opacity-60' : ''}`}></div>
-        <div className="relative flex flex-col bg-slate-900 rounded-xl border border-slate-700 p-4">
-          <label className="text-xs font-mono text-slate-400 mb-2 flex items-center gap-2">
-            <Sparkles className={`w-3 h-3 text-lime-400 ${isGenerating ? 'animate-spin' : ''}`} />
-            AI INSTRUCTIONS
+      <div className="relative group mt-2">
+        <div className={`absolute -inset-0.5 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl opacity-20 group-hover:opacity-40 blur transition duration-500 ${isGenerating ? 'animate-pulse opacity-60' : ''}`}></div>
+        <div className="relative flex flex-col bg-slate-950 rounded-xl border border-slate-700 p-4">
+          <label className="text-xs font-medium text-slate-300 tracking-wide mb-2 flex items-center gap-2">
+            <Sparkles className={`w-3 h-3 text-cyan-400 ${isGenerating ? 'animate-spin' : ''}`} />
+            AI Instructions
           </label>
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             disabled={isGenerating}
-            placeholder="Describe your circuit logic (e.g., 'Connect the ESP32 to the relay with a transistor driver...')"
+            placeholder="Describe your circuit logic (e.g., 'Connect the ESP32 to the relay...')"
             className="w-full bg-transparent border-none focus:ring-0 text-slate-200 placeholder-slate-600 resize-none h-24 text-sm leading-relaxed disabled:opacity-50"
           />
           <div className="flex justify-end mt-2">
             <button
               onClick={handleGenerateClick}
               disabled={isGenerating || (!file && !prompt)}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-lime-400 text-xs font-mono font-bold rounded-lg border border-slate-700 hover:border-lime-400/50 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+              className="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-white font-medium rounded-lg border border-slate-700 hover:border-cyan-400/50 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 shadow-lg"
             >
-              <FileUp className={`w-3 h-3 ${isGenerating ? 'animate-bounce' : ''}`} />
-              {isGenerating ? 'GENERATING...' : 'GENERATE'}
+              <FileUp className={`w-4 h-4 ${isGenerating ? 'animate-bounce text-cyan-400' : 'text-slate-400'}`} />
+              {isGenerating ? 'Reasoning...' : 'Generate Circuit'}
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

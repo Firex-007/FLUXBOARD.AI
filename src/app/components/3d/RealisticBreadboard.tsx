@@ -1,5 +1,5 @@
-import { useEffect, useRef, useMemo } from 'react';
-import * as THREE from 'three';
+import { useEffect, useRef, useMemo, useState } from 'react';
+import * as THREE from 'three/webgpu';
 import type { } from '@react-three/fiber';
 
 const PITCH = 0.254;
@@ -31,6 +31,8 @@ const RAIL_VCC_BOT_Z = PITCH * 7.5;
 const RAIL_GND_BOT_Z = PITCH * 8.5;
 
 export function RealisticBreadboard() {
+    const boardW = COLS * PITCH + 0.5;
+    const boardZ = 19 * PITCH + 0.5;
 
     // ── Compute all hole positions ─────────────────────────────────────────
     const { signalPositions, vccPositions, gndPositions } = useMemo(() => {
@@ -108,11 +110,36 @@ export function RealisticBreadboard() {
         }
     }, [signalPositions, vccPositions, gndPositions]);
 
-    const boardW = COLS * PITCH + 0.5;
-    const boardZ = 19 * PITCH + 0.5;
+    const [scanPos, setScanPos] = useState(-10);
+
+    // Entrance Animation: One-time scan across the board
+    useEffect(() => {
+        let frame: number;
+        let start = Date.now();
+        const animate = () => {
+            const elapsed = Date.now() - start;
+            const progress = Math.min(1, elapsed / 2000); // 2 second scan
+            setScanPos(-boardW / 2 + progress * boardW);
+            if (progress < 1) frame = requestAnimationFrame(animate);
+        };
+        animate();
+        return () => cancelAnimationFrame(frame);
+    }, [boardW]);
 
     return (
         <group>
+            {/* ── Base Ring (Anchored indicator) */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.19, 0]}>
+                <ringGeometry args={[boardZ / 2 + 0.1, boardZ / 2 + 0.12, 64]} />
+                <meshBasicMaterial color="#22d3ee" transparent opacity={0.4} />
+            </mesh>
+
+            {/* ── Digitizing Scan-Line */}
+            <mesh position={[scanPos, 0.05, 0]}>
+               <boxGeometry args={[0.05, 0.3, boardZ + 0.2]} />
+               <meshBasicMaterial color="#22d3ee" transparent opacity={0.6} />
+            </mesh>
+
             {/* ── Board body */}
             <mesh position={[0, -0.1, 0]}>
                 <boxGeometry args={[boardW, 0.2, boardZ]} />

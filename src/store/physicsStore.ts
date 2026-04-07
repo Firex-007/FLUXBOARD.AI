@@ -1,4 +1,8 @@
 import { create } from 'zustand';
+import * as THREE from 'three/webgpu';
+import { PhysicsEngine } from '../lib/PhysicsEngine';
+import { GridSystem } from '../lib/GridSystem';
+import { buildObstacleMap, routeWire } from '../lib/AStarRouter';
 
 export type HoleId = string; // e.g., 'A1', 'J60', 'VCC1_15', 'GND2_45'
 export type NetId = number;
@@ -8,6 +12,7 @@ export interface ComponentInstance {
     type: string;
     pins: Record<string, HoleId>; // e.g., { 'yin': 'A1', 'yang': 'A3' }
     rotation: number;
+    isSeated?: boolean; // Contact resistance logical break
 }
 
 export interface WireInstance {
@@ -24,11 +29,24 @@ interface PhysicsState {
     // The DSU disjoint set array for the nodes
     parent: Record<HoleId, HoleId>;
 
+    // Evaluated Physical/Electrical State
+    shortCircuit: boolean;
+    activeComponents: Set<string>;
+    errors: string[];
+    safetyReport: any; // Result from GridSystem.getSafetyReport
+
+    // Pre-computed A* routed wire paths (rebuilt each rebuildGraph call)
+    routedWires: Record<string, THREE.Vector3[]>;
+
+    // BFS Visual Tracing (glow the path of current)
+    currentPaths: { source: HoleId, dest: HoleId, path: HoleId[] }[];
+
     // Actions
     addComponent: (comp: ComponentInstance) => void;
     removeComponent: (id: string) => void;
     addWire: (wire: WireInstance) => void;
     removeWire: (id: string) => void;
+    confirmPlacement: (id: string) => void;
 
     // Get the NetId for a topological hole
     getNetId: (hole: HoleId) => NetId;
@@ -37,81 +55,59 @@ interface PhysicsState {
     rebuildGraph: () => void;
 }
 
-// Helper to determine base breadboard internal connections (The Metal Clip Law)
-function getBaseConnectedHoles(hole: HoleId): HoleId[] {
-    // A standard full-size breadboard has 63 or 60 columns. Let's assume 60.
-    // Rows 1-60.
-    // Power Rails: Left (+ -) Right (+ -), split at 30? The rule: "The outer Power Rails (VCC/GND) break connectivity at column 30."
 
-    const connected: HoleId[] = [];
-
-    // Match standard signal holes: A-J, 1-60
-    const signalMatch = hole.match(/^([A-J])(\d+)$/);
-    if (signalMatch) {
-        const col = signalMatch[1];
-        const row = parseInt(signalMatch[2], 10);
-
-        // Metal Clip Law: Columns A-E are electrically connected. Columns F-J are electrically connected.
-        const leftCols = ['A', 'B', 'C', 'D', 'E'];
-        const rightCols = ['F', 'G', 'H', 'I', 'J'];
-
-        if (leftCols.includes(col)) {
-            leftCols.forEach(c => {
-                if (c !== col) connected.push(`${c}${row}`);
-            });
-        } else if (rightCols.includes(col)) {
-            rightCols.forEach(c => {
-                if (c !== col) connected.push(`${c}${row}`);
-            });
-        }
-        return connected;
-    }
-
-    // Power rails: e.g., VCC_LEFT_15 (meaning left VCC rail, row 15)
-    // Need to parse power rails and split at 30.
-    // Let's use format: RAIL_{TYPE}_{SIDE}_{INDEX}  (e.g., RAIL_VCC_L_10)
-    const railMatch = hole.match(/^RAIL_(VCC|GND)_(L|R)_(\d+)$/);
-    if (railMatch) {
-        const type = railMatch[1];
-        const side = railMatch[2];
-        const index = parseInt(railMatch[3], 10);
-
-        // Split at 30 means 1-30 are connected, 31-60 are connected
-        const start = index <= 30 ? 1 : 31;
-        const end = index <= 30 ? 30 : 60;
-
-        for (let i = start; i <= end; i++) {
-            if (i !== index) {
-                connected.push(`RAIL_${type}_${side}_${i}`);
-            }
-        }
-    }
-
-    return connected;
-}
 
 export const usePhysicsStore = create<PhysicsState>((set, get) => ({
     components: [],
     wires: [],
     parent: {},
+    shortCircuit: false,
+    activeComponents: new Set(),
+    errors: [],
+    safetyReport: { shorts: [], polarityErrors: [], mechanicalConflicts: [], railGaps: [] },
+    routedWires: {},
+    currentPaths: [],
 
-    addComponent: (comp) => set((state) => {
-        const newComps = [...state.components, comp];
-        return { components: newComps };
-    }),
+    addComponent: (comp) => {
+        set((state) => {
+            const newComps = [...state.components, comp];
+            return { components: newComps };
+        });
+        get().rebuildGraph();
+    },
 
-    removeComponent: (id) => set((state) => {
-        return { components: state.components.filter(c => c.id !== id) };
-    }),
+    removeComponent: (id) => {
+        set((state) => {
+            return { components: state.components.filter(c => c.id !== id) };
+        });
+        get().rebuildGraph();
+    },
 
-    addWire: (wire) => set((state) => {
-        const newWires = [...state.wires, wire];
-        return { wires: newWires };
-    }),
+    confirmPlacement: (id) => {
+        set((state) => {
+            return { 
+                components: state.components.map(c => 
+                    c.id === id ? { ...c, isSeated: true } : c
+                ) 
+            };
+        });
+        get().rebuildGraph();
+    },
 
-    removeWire: (id) => set((state) => {
-        return { wires: state.wires.filter(w => w.id !== id) };
-    }),
+    addWire: (wire) => {
+        set((state) => {
+            const newWires = [...state.wires, wire];
+            return { wires: newWires };
+        });
+        get().rebuildGraph();
+    },
+
+    removeWire: (id) => {
+        set((state) => {
+            return { wires: state.wires.filter(w => w.id !== id) };
+        });
+        get().rebuildGraph();
+    },
 
     getNetId: (hole) => {
         let current = hole;
@@ -188,6 +184,51 @@ export const usePhysicsStore = create<PhysicsState>((set, get) => ({
             union(wire.source, wire.dest);
         });
 
-        set({ parent });
+        // 3. Evaluate Physics Logic
+        const seatedComponents = state.components.filter(c => c.isSeated !== false);
+        const physicsErrors = PhysicsEngine.validatePlacements(seatedComponents, state.wires);
+        const evalState = PhysicsEngine.evaluateCircuit(seatedComponents, state.wires);
+        
+        // 3.5 Generate new Safety Report via GridSystem
+        const safetyReport = GridSystem.getSafetyReport(state.components, state.wires);
+
+        // Merge collision errors with electrical errors
+        const combinedErrors = [...physicsErrors, ...evalState.errors, ...safetyReport.railGaps, ...safetyReport.mechanicalConflicts, ...safetyReport.polarityErrors];
+
+        // 4. Build A* obstacle map and route all wires
+        const obstacleMap = buildObstacleMap(state.components);
+        const routedWires: Record<string, THREE.Vector3[]> = {};
+        state.wires.forEach((wire, idx) => {
+            routedWires[wire.id] = routeWire(obstacleMap, wire.source, wire.dest, idx);
+        });
+
+        // 5. Map node-based current paths to HoleId-based paths for rendering
+        const currentPaths = evalState.activePaths.map(pathNodes => {
+            const pathHoles: HoleId[] = pathNodes.map(nodeKey => {
+                // Heuristic: STRIP:15:L -> C15, RAIL:VCC:L:1 -> RAIL_VCC_L_1
+                if (nodeKey.startsWith('STRIP:')) {
+                    const [, col, side] = nodeKey.split(':');
+                    const rowLetter = side === 'L' ? 'C' : 'H'; // Midpoint of half
+                    return `${rowLetter}${col}`;
+                } else if (nodeKey.startsWith('RAIL:')) {
+                    const [, type, side, half] = nodeKey.split(':');
+                    const col = half === '1' ? '15' : '45';
+                    return `RAIL_${type}_${side}_${col}`;
+                }
+                return nodeKey;
+            });
+            return { source: pathHoles[0], dest: pathHoles[pathHoles.length - 1], path: pathHoles };
+        });
+
+        set({ 
+            parent,
+            components: state.components.map(c => evalState.correctedComponents.find(ec => ec.id === c.id) || c), // Maintain isSeated across eval
+            shortCircuit: evalState.shortCircuit,
+            activeComponents: evalState.activeComponents,
+            errors: combinedErrors,
+            routedWires,
+            currentPaths,
+            safetyReport
+        });
     }
 }));

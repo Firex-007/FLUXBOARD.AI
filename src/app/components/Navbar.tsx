@@ -1,19 +1,19 @@
 import { useState } from 'react';
-import { Cpu, Zap, X, BookOpen, FolderOpen, Settings2, User } from 'lucide-react';
+import { Cpu, Zap, X, BookOpen, FolderOpen, Settings2, Scan } from 'lucide-react';
 import { useLibraryStore, exportCircuitToFile, importCircuitFromFile } from '../../store/libraryStore';
 import { usePhysicsStore } from '../../store/physicsStore';
-import { toast } from 'sonner';
+import { toast } from 'sonner'; 
+import { isSafari } from '../../lib/utils/browser';
 
 type Panel = 'library' | 'projects' | 'settings' | 'profile' | null;
 
-export function Navbar() {
+export function Navbar({ onLaunchAR }: { onLaunchAR?: () => void }) {
   const [panel, setPanel] = useState<Panel>(null);
-  const toggle = (p: Panel) => setPanel(prev => (prev === p ? null : p));
+  const toggle = (p: Panel) => setPanel((prev: Panel) => (prev === p ? null : p));
 
-  const circuits = useLibraryStore(s => s.circuits);
-  const deleteCircuit = useLibraryStore(s => s.deleteCircuit);
-  const renameCircuit = useLibraryStore(s => s.renameCircuit);
-  const importCircuit = useLibraryStore(s => s.importCircuit);
+  const circuits = useLibraryStore((s: any) => s.circuits);
+  const deleteCircuit = useLibraryStore((s: any) => s.deleteCircuit);
+  const renameCircuit = useLibraryStore((s: any) => s.renameCircuit);
   const addComponent = usePhysicsStore((s: any) => s.addComponent);
   const addWire = usePhysicsStore((s: any) => s.addWire);
   const rebuildGraph = usePhysicsStore((s: any) => s.rebuildGraph);
@@ -25,13 +25,6 @@ export function Navbar() {
     rebuildGraph();
     setPanel(null);
     toast.success(`📂 Loaded "${c.name}"`);
-  };
-
-  const handleImportFile = async () => {
-    const circuit = await importCircuitFromFile();
-    if (!circuit) return;
-    importCircuit(circuit);
-    toast.success(`📥 Imported "${circuit.name}" from file`);
   };
 
   const navBtn = (id: Panel, label: string, Icon: any) => {
@@ -59,35 +52,71 @@ export function Navbar() {
 
   return (
     <>
-      <nav className="w-full h-14 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md flex items-center px-4 sticky top-0 z-50">
-        {/* Logo */}
-        <div className="flex items-center gap-2 cursor-pointer flex-shrink-0" onClick={() => window.location.reload()}>
+      <nav className="fixed top-4 left-1/2 -translate-x-1/2 w-[98%] md:w-[90%] max-w-7xl h-16 hud-glass rounded-2xl z-[100] flex items-center px-4 md:px-6 shadow-[0_0_40px_rgba(0,0,0,0.6)] border border-white/5 group scan-effect">
+        {/* Logo Section */}
+        <div className="flex items-center gap-3 md:gap-4 cursor-pointer flex-shrink-0 group/logo" onClick={() => window.location.reload()}>
           <div className="relative">
-            <Cpu className="w-6 h-6 text-lime-400" />
-            <Zap className="w-3 h-3 text-cyan-400 absolute -top-0.5 -right-0.5 animate-pulse" />
+            <Cpu className="w-6 h-6 md:w-7 md:h-7 text-cyan-400 group-hover/logo:text-lime-400 transition-colors duration-500" />
+            <Zap className="w-3 h-3 md:w-3.5 md:h-3.5 text-lime-400 absolute -top-1 -right-1 animate-pulse hud-glow rounded-full" />
           </div>
-          <h1 className="text-lg font-bold tracking-tighter text-white">
-            FLUX<span className="text-lime-400">BOARD</span><span className="text-cyan-400">.AI</span>
+          <h1 className="text-lg md:text-xl font-bold tracking-tighter text-white hidden xs:block">
+            FLUX<span className="text-cyan-400">BOARD</span><span className="text-lime-400/80">.AI</span>
           </h1>
         </div>
 
-        {/* Nav links */}
-        <div className="ml-auto flex items-center gap-2">
-          {navBtn('projects', 'PROJECTS', FolderOpen)}
-          {navBtn('library', 'LIBRARY', BookOpen)}
-          {navBtn('settings', 'SETTINGS', Settings2)}
+        {/* Dynamic Navigation HUD */}
+        <div className="ml-auto flex items-center gap-2 md:gap-3">
+          <div className="hidden md:flex items-center gap-1.5 p-1 bg-white/5 rounded-xl border border-white/5 mr-2">
+            {navBtn('projects', 'PROJECTS', FolderOpen)}
+            {navBtn('library', 'LIBRARY', BookOpen)}
+            {navBtn('settings', 'CONFIG', Settings2)}
+          </div>
 
-          {/* User avatar */}
+          {/* Simple Mobile Icons */}
+          <div className="flex md:hidden items-center gap-1.5 mr-1">
+             <button onClick={() => toggle('library')} className={`p-2 rounded-xl transition-all ${panel === 'library' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-slate-400 hover:text-white'}`}>
+                <BookOpen className="w-5 h-5" />
+             </button>
+             <button onClick={() => toggle('settings')} className={`p-2 rounded-xl transition-all ${panel === 'settings' ? 'bg-slate-500/20 text-slate-400 border border-slate-500/30' : 'text-slate-400 hover:text-white'}`}>
+                <Settings2 className="w-5 h-5" />
+             </button>
+          </div>
+
+          {/* ── AR Launcher NODE ── */}
           <button
-            onClick={() => toggle('profile')}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-mono font-bold transition-all ml-2"
+            id="ar-launch-btn"
+            onClick={() => {
+                if (isSafari()) {
+                    toast.info("Enhanced mobile support for iOS is currently in development. High-fidelity AR coming soon!");
+                } else if (onLaunchAR) {
+                    onLaunchAR();
+                }
+            }}
+            className="group/ar flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl text-[10px] md:text-xs font-bold transition-all duration-500 relative overflow-hidden"
             style={{
-              background: panel === 'profile' ? 'linear-gradient(135deg,#0e7490,#06b6d4)' : 'rgba(30,41,59,0.8)',
-              border: `1.5px solid ${panel === 'profile' ? '#22d3ee' : '#334155'}`,
-              color: panel === 'profile' ? '#fff' : '#22d3ee',
-              boxShadow: panel === 'profile' ? '0 0 12px #22d3ee44' : 'none',
+              background: 'rgba(34,211,238,0.1)',
+              border: '1px solid rgba(34,211,238,0.3)',
+              color: '#22d3ee',
+              opacity: isSafari() ? 0.6 : 1,
+              boxShadow: '0 0 20px rgba(34,211,238,0.15)',
             }}
           >
+            <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 to-transparent translate-x-[-100%] group-hover/ar:translate-x-[100%] transition-transform duration-1000" />
+            <Scan className="w-4 h-4 animate-pulse" />
+            <span className="hidden sm:inline tracking-widest">{isSafari() ? 'iOS BETA' : 'ENGAGE AR'}</span>
+            
+            {/* Pulsing Core */}
+            <span className="absolute inset-0 border border-cyan-400/20 rounded-xl animate-ping opacity-20 pointer-events-none" />
+          </button>
+
+          {/* User Node */}
+          <button
+            onClick={() => toggle('profile')}
+            className={`w-9 h-9 md:w-10 md:h-10 rounded-xl flex items-center justify-center text-[10px] md:text-xs font-bold transition-all ml-1 relative overflow-hidden ${
+                panel === 'profile' ? 'border-cyan-400 bg-cyan-900/40 text-white' : 'border-white/10 bg-white/5 text-cyan-400 hover:border-cyan-400/50'
+            } border`}
+          >
+            {panel === 'profile' && <div className="absolute inset-0 hud-glow opacity-50" />}
             US
           </button>
         </div>
@@ -109,11 +138,11 @@ export function Navbar() {
           <div className="my-1 border-t border-slate-800" />
           {circuits.length === 0 ? (
             <EmptyState icon="📭" msg="No circuits saved yet. Use the Save button above!" />
-          ) : circuits.map(c => (
+          ) : circuits.map((c: any) => (
             <LibraryCard key={c.id} circuit={c}
               onLoad={() => loadCircuit(c)}
               onDelete={() => { deleteCircuit(c.id); toast.info('Deleted from library'); }}
-              onRename={(name) => renameCircuit(c.id, name)}
+              onRename={(name: string) => renameCircuit(c.id, name)}
             />
           ))}
         </SlidePanel>
@@ -182,7 +211,7 @@ function LibrarySaveSection({ onSaved }: { onSaved: () => void }) {
   const [name, setName] = useState('');
   const components = usePhysicsStore((s: any) => s.components);
   const wires = usePhysicsStore((s: any) => s.wires);
-  const saveCircuit = useLibraryStore(s => s.saveCircuit);
+  const saveCircuit = useLibraryStore((s: any) => s.saveCircuit);
   const hasContent = components.length > 0;
 
   const handle = () => {
@@ -220,7 +249,6 @@ function LibrarySaveSection({ onSaved }: { onSaved: () => void }) {
       {/* Import from file */}
       <button
         onClick={async () => {
-          const { importCircuitFromFile } = await import('../../store/libraryStore');
           const circuit = await importCircuitFromFile();
           if (!circuit) return;
           useLibraryStore.getState().importCircuit(circuit);
@@ -305,7 +333,7 @@ function SettingsContent() {
 
       <SectionLabel>🧪 Simulation</SectionLabel>
       <SettingRow label="SPICE Engine" value={<span className="text-xs font-mono text-lime-400">ngspice.wasm ✓</span>} />
-      <SettingRow label="AI Model" value={<span className="text-xs font-mono text-cyan-400">gemini-2.5-flash</span>} />
+      <SettingRow label="AI Model" value={<span className="text-xs font-mono text-cyan-400">gemini-3-flash</span>} />
 
       <div className="mt-4 pt-4 border-t border-slate-800">
         <button
@@ -339,7 +367,7 @@ function ProfileContent({ circuits }: { circuits: any[] }) {
           { label: 'Saved Circuits', val: circuits.length, color: '#a78bfa' },
           { label: 'Total Components', val: circuits.reduce((a, c) => a + c.components.length, 0), color: '#22d3ee' },
           { label: 'Total Wires', val: circuits.reduce((a, c) => a + c.wires.length, 0), color: '#4ade80' },
-          { label: 'AI Model', val: '2.5-flash', color: '#f59e0b' },
+          { label: 'AI Model', val: '3-flash', color: '#f59e0b' },
         ].map(s => (
           <div key={s.label} className="p-3 rounded-xl border border-slate-800 flex flex-col gap-1"
             style={{ background: 'rgba(15,23,42,0.7)' }}>

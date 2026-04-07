@@ -3,6 +3,7 @@ import { OrbitControls } from '@react-three/drei';
 import { RealisticBreadboard } from './RealisticBreadboard';
 import { WiringVisuals } from './WiringVisuals';
 import { ComponentsOnBoard } from './ComponentsOnBoard';
+import { CurrentTracer } from './CurrentTracer';
 
 export function Scene() {
     return (
@@ -35,6 +36,7 @@ export function Scene() {
                     <RealisticBreadboard />
                     <ComponentsOnBoard />
                     <WiringVisuals />
+                    <CurrentTracer />
                 </group>
 
                 <OrbitControls
